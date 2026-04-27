@@ -778,77 +778,63 @@ function alertClass(kp) {
 
 // ─── GFZ nowcast fetch ─────────────────────────────────────────────────────
 async function fetchKpNowcast() {
-  // Try JSON API first (more reliable)
+  // GFZ JSON API — definitive + nowcast, last 3 days
   const now = new Date();
-  const start = new Date(now - 2 * 24 * 3600000);
-  const fmt = d => d.toISOString().slice(0,19) + 'Z';
-  const jsonUrl = `https://kp.gfz.de/app/json/?start=${encodeURIComponent(fmt(start))}&end=${encodeURIComponent(fmt(now))}&index=Kp&status=nowcast`;
-
-  try {
-    const r = await fetch(jsonUrl);
-    if (r.ok) {
-      const data = await r.json();
-      if (data.datetime && data.Kp && data.datetime.length > 0) {
-        return data.datetime.map((dt, i) => ({
-          dt: new Date(dt),
-          kp: data.Kp[i]
-        })).filter(e => !isNaN(e.kp)).sort((a,b) => a.dt - b.dt);
-      }
-    }
-  } catch(e) { /* fall through to text file */ }
-
-  // Fallback: text nowcast file
-  // GFZ nowcast format: YYYY MM DD hh.h  Kp  ap  D
-  // Columns (space-separated): 0=YYYY 1=MM 2=DD 3=hh.h 4=Kp 5=ap 6=D
-  // OR extended: YYYY MM DD hh mm ss.sss Kp ap D (7 cols before Kp)
-  const txtUrl = 'https://kp.gfz.de/app/files/Kp_ap_nowcast.txt';
-  const r2 = await fetch(txtUrl);
-  if (!r2.ok) throw new Error(`GFZ HTTP ${r2.status}`);
-  const text = await r2.text();
-
-  const entries = [];
-  for (const line of text.split('\n')) {
-    const t = line.trim();
-    if (!t || t.startsWith('#')) continue;
-    const parts = t.split(/\s+/);
-    if (parts.length < 5) continue;
-    try {
-      const yr = parseInt(parts[0]);
-      const mo = parseInt(parts[1]);
-      const dy = parseInt(parts[2]);
-      if (isNaN(yr) || isNaN(mo) || isNaN(dy)) continue;
-
-      // Detect format by checking if parts[3] has a decimal (short format hh.h)
-      // vs parts[3] being integer hours (long format YYYY MM DD hh mm ss Kp...)
-      let hh, kp;
-      if (parts[3].includes('.') && parts.length >= 5) {
-        // Short format: YYYY MM DD hh.h Kp ap D
-        hh = Math.floor(parseFloat(parts[3]));
-        kp = parseFloat(parts[4]);
-      } else if (parts.length >= 8) {
-        // Long format: YYYY MM DD hh mm ss Kp ap D
-        hh = parseInt(parts[3]);
-        kp = parseFloat(parts[6]);
-      } else {
-        kp = parseFloat(parts[4]);
-        hh = parseInt(parts[3]);
-      }
-
-      if (isNaN(kp) || isNaN(hh)) continue;
-      const dt = new Date(Date.UTC(yr, mo-1, dy, hh, 0, 0));
-      entries.push({ dt, kp });
-    } catch(e) { continue; }
-  }
-  if (entries.length === 0) throw new Error('GFZ: no valid data parsed');
-  return entries.sort((a,b) => a.dt - b.dt);
+  const start = new Date(now.getTime() - 3 * 24 * 3600 * 1000);
+  const s = start.getUTCFullYear() + '-' + String(start.getUTCMonth()+1).padStart(2,'0') + '-' + String(start.getUTCDate()).padStart(2,'0') + 'T00:00:00Z';
+  const e = now.getUTCFullYear() + '-' + String(now.getUTCMonth()+1).padStart(2,'0') + '-' + String(now.getUTCDate()).padStart(2,'0') + 'T23:59:59Z';
+  const url = 'https://kp.gfz.de/app/json/?start=' + s + '&end=' + e + '&index=Kp&status=def%2Bnowcast';
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('GFZ HTTP ' + r.status);
+  const data = await r.json();
+  if (!data.datetime || !data.Kp || data.datetime.length === 0) throw new Error('GFZ returned empty payload');
+  return data.datetime.map((dt, i) => ({ dt: new Date(dt), kp: data.Kp[i] }))
+    .filter(e => !isNaN(e.kp) && !isNaN(e.dt.getTime()))
+    .sort((a, b) => a.dt - b.dt);
 }
 
-// ─── NOAA 3-day forecast ───────────────────────────────────────────────────
 async function fetchNoaaForecast() {
   const url = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json';
   const r = await fetch(url);
-  if (!r.ok) throw new Error(`NOAA HTTP ${r.status}`);
+  if (!r.ok) throw new Error('NOAA HTTP ' + r.status);
   return await r.json();
+}
+
+// ─── Main init ─────────────────────────────────────────────────────────────
+async function init() {
+  document.getElementById('last-updated').textContent = 'Refreshing…';
+  document.getElementById('bar-chart').innerHTML = '<div class="status-msg">Fetching Kp data<span class="loading-dot">…</span></div>';
+  document.getElementById('forecast-grid').innerHTML = '<div class="status-msg">Fetching forecast<span class="loading-dot">…</span></div>';
+
+  // Kp data
+  try {
+    const entries = await fetchKpNowcast();
+    if (entries.length === 0) throw new Error('No readings in response');
+    updateLiveIndicators(entries);
+    buildBarChart(entries);
+  } catch(err) {
+    console.error('Kp fetch error:', err);
+    document.getElementById('bar-chart').innerHTML =
+      '<div class="status-msg" style="color:var(--storm);">Kp fetch failed: ' + err.message + '</div>';
+    ['curr-kp','peak-24','mod-alert-status','high-alert-status','storm-level'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = 'ERR'; el.style.color = 'var(--storm)'; }
+    });
+    document.getElementById('live-kp-badge').textContent = '—';
+    document.getElementById('live-time').textContent = 'Fetch failed — ' + err.message;
+  }
+
+  // NOAA forecast
+  try {
+    const forecastRaw = await fetchNoaaForecast();
+    buildForecast(forecastRaw);
+  } catch(err) {
+    console.error('Forecast fetch error:', err);
+    document.getElementById('forecast-grid').innerHTML =
+      '<div class="status-msg" style="color:var(--storm);">Forecast unavailable: ' + err.message + '</div>';
+  }
+
+  document.getElementById('last-updated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
 }
 
 // ─── Build bar chart ───────────────────────────────────────────────────────
