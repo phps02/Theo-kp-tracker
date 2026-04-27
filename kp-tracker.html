@@ -780,37 +780,23 @@ function alertClass(kp) {
 
 // ─── GFZ nowcast fetch ─────────────────────────────────────────────────────
 async function fetchKpNowcast() {
-  // NOAA SWPC observed Kp — public API, CORS-enabled, updated every 3hrs
   const url = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
   const r = await fetch(url);
   if (!r.ok) throw new Error('NOAA Kp HTTP ' + r.status);
   const data = await r.json();
 
-  // Log raw response so we can see the exact format
-  console.log('NOAA Kp raw response:', JSON.stringify(data).slice(0, 500));
-  document.getElementById('debug-output').textContent = 'NOAA raw: ' + JSON.stringify(data).slice(0, 300);
-
-  if (!data || data.length < 2) throw new Error('NOAA Kp: empty response, length=' + (data ? data.length : 'null'));
-
-  // NOAA format: [[time_tag, kp, observed, noaa_scale], ...]
-  // First row is headers, rest are data
+  // Format: array of objects {time_tag, Kp, a_running, station_count}
+  // No header row — straight array of objects
   const entries = [];
-  for (let i = 1; i < data.length; i++) {
+  for (const row of data) {
     try {
-      const row = data[i];
-      console.log('Row', i, ':', JSON.stringify(row));
-      // time_tag format: "2026-04-26 00:00:00"
-      const dtStr = row[0].replace(' ', 'T') + 'Z';
-      const dt = new Date(dtStr);
-      const kp = parseFloat(row[1]);
+      const dt = new Date(row.time_tag + 'Z');
+      const kp = parseFloat(row.Kp);
       if (!isNaN(dt.getTime()) && !isNaN(kp)) entries.push({ dt, kp });
-    } catch(e) { console.warn('Row parse error:', e); continue; }
+    } catch(e) { continue; }
   }
-
-  console.log('Parsed entries:', entries.length, entries.slice(-3));
-  document.getElementById('debug-output').textContent += ' | Parsed: ' + entries.length + ' entries. Last: ' + (entries.length ? JSON.stringify(entries[entries.length-1]) : 'none');
-
   if (entries.length === 0) throw new Error('NOAA Kp: no valid readings parsed');
+  document.getElementById('debug-output').textContent = 'OK — ' + entries.length + ' readings. Latest: Kp ' + entries[entries.length-1].kp + ' at ' + entries[entries.length-1].dt.toUTCString().slice(5,22) + ' UTC';
   return entries.sort((a, b) => a.dt - b.dt);
 }
 
@@ -934,21 +920,27 @@ function buildForecast(data) {
   const grid = document.getElementById('forecast-grid');
   grid.innerHTML = '';
 
-  if (!data || data.length < 2) {
+  if (!data || data.length === 0) {
     grid.innerHTML = '<div class="status-msg">Forecast unavailable</div>';
     return;
   }
 
-  // NOAA format: [[time_tag, kp, observed, noaa_scale], ...]
-  // Group by day, take max Kp per day
+  // Handle both formats:
+  // Object format: [{time_tag, kp, ...}]
+  // Array format: [["time_tag","kp",...], [data rows...]]
+  const isObjects = data[0] && typeof data[0] === 'object' && !Array.isArray(data[0]);
+  const rows = isObjects ? data : data.slice(1);
+
   const byDay = {};
   const now = new Date();
-  data.slice(1).forEach(row => {
+  rows.forEach(row => {
     try {
-      const dt = new Date(row[0]);
-      if (dt < now) return;
+      const timeStr = isObjects ? row.time_tag : row[0];
+      const kpVal   = isObjects ? (row.kp || row.Kp) : row[1];
+      const dt = new Date(timeStr.includes('T') ? timeStr + 'Z' : timeStr.replace(' ','T') + 'Z');
+      if (dt <= now) return;
       const key = dt.toISOString().slice(0,10);
-      const kp = parseFloat(row[1]);
+      const kp = parseFloat(kpVal);
       if (isNaN(kp)) return;
       if (!byDay[key] || kp > byDay[key]) byDay[key] = kp;
     } catch(e) {}
