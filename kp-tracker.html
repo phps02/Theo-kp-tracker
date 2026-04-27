@@ -542,6 +542,8 @@
 
 <div id="alert-banner"></div>
 
+<div id="debug-output" style="margin:10px 20px;padding:10px;background:#fffbe6;border:1px solid #f59e0b;border-radius:6px;font-family:monospace;font-size:0.7rem;color:#92400e;line-height:1.6;word-break:break-all;">Initializing…</div>
+
 <div class="container">
 
   <!-- Current conditions -->
@@ -779,22 +781,35 @@ function alertClass(kp) {
 // ─── GFZ nowcast fetch ─────────────────────────────────────────────────────
 async function fetchKpNowcast() {
   // NOAA SWPC observed Kp — public API, CORS-enabled, updated every 3hrs
-  // Format: [[time_tag, kp, observed, noaa_scale], ...]
   const url = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
   const r = await fetch(url);
   if (!r.ok) throw new Error('NOAA Kp HTTP ' + r.status);
   const data = await r.json();
-  if (!data || data.length < 2) throw new Error('NOAA Kp: empty response');
 
-  // Skip header row [0], parse remaining rows
+  // Log raw response so we can see the exact format
+  console.log('NOAA Kp raw response:', JSON.stringify(data).slice(0, 500));
+  document.getElementById('debug-output').textContent = 'NOAA raw: ' + JSON.stringify(data).slice(0, 300);
+
+  if (!data || data.length < 2) throw new Error('NOAA Kp: empty response, length=' + (data ? data.length : 'null'));
+
+  // NOAA format: [[time_tag, kp, observed, noaa_scale], ...]
+  // First row is headers, rest are data
   const entries = [];
   for (let i = 1; i < data.length; i++) {
     try {
-      const dt = new Date(data[i][0].replace(' ', 'T') + 'Z');
-      const kp = parseFloat(data[i][1]);
+      const row = data[i];
+      console.log('Row', i, ':', JSON.stringify(row));
+      // time_tag format: "2026-04-26 00:00:00"
+      const dtStr = row[0].replace(' ', 'T') + 'Z';
+      const dt = new Date(dtStr);
+      const kp = parseFloat(row[1]);
       if (!isNaN(dt.getTime()) && !isNaN(kp)) entries.push({ dt, kp });
-    } catch(e) { continue; }
+    } catch(e) { console.warn('Row parse error:', e); continue; }
   }
+
+  console.log('Parsed entries:', entries.length, entries.slice(-3));
+  document.getElementById('debug-output').textContent += ' | Parsed: ' + entries.length + ' entries. Last: ' + (entries.length ? JSON.stringify(entries[entries.length-1]) : 'none');
+
   if (entries.length === 0) throw new Error('NOAA Kp: no valid readings parsed');
   return entries.sort((a, b) => a.dt - b.dt);
 }
