@@ -743,14 +743,14 @@
   <!-- Mechanism note -->
   <div style="margin-top:16px;padding:14px 18px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;font-size:0.78rem;color:var(--text2);line-height:1.8;font-family:var(--serif);">
     <strong style="font-family:var(--mono);font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);">Mechanism · Why geomagnetic storms affect seizure threshold</strong><br>
-    Geomagnetic storms suppress nocturnal melatonin via cryptochrome-mediated HPA axis activation. Suppressed melatonin lowers the threshold for hippocampal/amygdala seizure discharge propagation. The mitigation strategy targets this pathway directly — melatonin supplementation during storm windows, magnesium (NMDA antagonist) to block calcium flux, and stress minimization to avoid HPA co-activation. Source: Persinger et al. (Int J Biometeorology) · GFZ Potsdam Kp data (CC BY 4.0).
+    Geomagnetic storms suppress nocturnal melatonin via cryptochrome-mediated HPA axis activation. Suppressed melatonin lowers the threshold for hippocampal/amygdala seizure discharge propagation. The mitigation strategy targets this pathway directly — melatonin supplementation during storm windows, magnesium (NMDA antagonist) to block calcium flux, and stress minimization to avoid HPA co-activation. Source: Persinger et al. (Int J Biometeorology) · Kp data: NOAA SWPC (services.swpc.noaa.gov).
   </div>
   </div>
 
 </div><!-- /container -->
 
 <footer>
-  <span>Data: GFZ Potsdam · NOAA SWPC · CC BY 4.0 · For veterinary discussion only</span>
+  <span>Data: NOAA SWPC · services.swpc.noaa.gov · For veterinary discussion only</span>
   <button id="refresh-btn" onclick="init()">↺ Refresh</button>
   <span id="last-updated">—</span>
 </footer>
@@ -778,25 +778,31 @@ function alertClass(kp) {
 
 // ─── GFZ nowcast fetch ─────────────────────────────────────────────────────
 async function fetchKpNowcast() {
-  // GFZ JSON API — definitive + nowcast, last 3 days
-  const now = new Date();
-  const start = new Date(now.getTime() - 3 * 24 * 3600 * 1000);
-  const s = start.getUTCFullYear() + '-' + String(start.getUTCMonth()+1).padStart(2,'0') + '-' + String(start.getUTCDate()).padStart(2,'0') + 'T00:00:00Z';
-  const e = now.getUTCFullYear() + '-' + String(now.getUTCMonth()+1).padStart(2,'0') + '-' + String(now.getUTCDate()).padStart(2,'0') + 'T23:59:59Z';
-  const url = 'https://kp.gfz.de/app/json/?start=' + s + '&end=' + e + '&index=Kp&status=def%2Bnowcast';
+  // NOAA SWPC observed Kp — public API, CORS-enabled, updated every 3hrs
+  // Format: [[time_tag, kp, observed, noaa_scale], ...]
+  const url = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json';
   const r = await fetch(url);
-  if (!r.ok) throw new Error('GFZ HTTP ' + r.status);
+  if (!r.ok) throw new Error('NOAA Kp HTTP ' + r.status);
   const data = await r.json();
-  if (!data.datetime || !data.Kp || data.datetime.length === 0) throw new Error('GFZ returned empty payload');
-  return data.datetime.map((dt, i) => ({ dt: new Date(dt), kp: data.Kp[i] }))
-    .filter(e => !isNaN(e.kp) && !isNaN(e.dt.getTime()))
-    .sort((a, b) => a.dt - b.dt);
+  if (!data || data.length < 2) throw new Error('NOAA Kp: empty response');
+
+  // Skip header row [0], parse remaining rows
+  const entries = [];
+  for (let i = 1; i < data.length; i++) {
+    try {
+      const dt = new Date(data[i][0].replace(' ', 'T') + 'Z');
+      const kp = parseFloat(data[i][1]);
+      if (!isNaN(dt.getTime()) && !isNaN(kp)) entries.push({ dt, kp });
+    } catch(e) { continue; }
+  }
+  if (entries.length === 0) throw new Error('NOAA Kp: no valid readings parsed');
+  return entries.sort((a, b) => a.dt - b.dt);
 }
 
 async function fetchNoaaForecast() {
   const url = 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json';
   const r = await fetch(url);
-  if (!r.ok) throw new Error('NOAA HTTP ' + r.status);
+  if (!r.ok) throw new Error('NOAA forecast HTTP ' + r.status);
   return await r.json();
 }
 
