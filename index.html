@@ -217,7 +217,7 @@ footer span{font-size:10px;color:#7a9a80;letter-spacing:1px;font-family:monospac
   </table>
   <div class="notes" style="margin-top:8px">
     <h3>Sensitivity ceiling</h3>
-    Sep 25, Dec 19, and Mar 17 were geomagnetically quiet — those clusters are driven by other triggers. Maximum achievable sensitivity from Kp alone is 57%. Use alongside barometric pressure and humidity data from the main seizure monitor.
+    Sep 25, Dec 19, Mar 17, and May 22 were geomagnetically quiet — those clusters are driven by other triggers. Maximum achievable sensitivity from Kp alone is 50%. Use alongside barometric pressure and humidity data from the main seizure monitor.
   </div>
 
   <!-- Mitigation protocol -->
@@ -251,6 +251,9 @@ footer span{font-size:10px;color:#7a9a80;letter-spacing:1px;font-family:monospac
 
   <!-- Historical clusters -->
   <div class="section-head">Historical Cluster Lookup · GFZ Definitive Data</div>
+  <div class="notes" style="margin-bottom:10px;font-size:11px;line-height:1.5">
+    <strong>Methodology:</strong> Peak Kp is the maximum 3-hour planetary Kp value observed during the 24 hours immediately preceding the first seizure of each cluster. Verdicts: <span class="kp-quiet" style="font-weight:600">QUIET</span> (peak &lt; 4), <span class="kp-active" style="font-weight:600">ACTIVE</span> (peak ≥ 4), <span class="kp-storm" style="font-weight:600">G2 STORM</span> (peak ≥ 5). Sources: NOAA SWPC daily geomagnetic indices (<a href="https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt" target="_blank" rel="noopener" style="color:#4a7a58">services.swpc.noaa.gov</a>) and GFZ Potsdam definitive Kp archive (<a href="https://kp.gfz.de/en/data" target="_blank" rel="noopener" style="color:#4a7a58">kp.gfz.de</a>).
+  </div>
   <table>
     <thead>
       <tr>
@@ -303,41 +306,56 @@ footer span{font-size:10px;color:#7a9a80;letter-spacing:1px;font-family:monospac
         <td><span class="badge" style="background:#f0fdf4;color:#15803d;border-color:#86efac">QUIET ✗</span></td>
         <td class="cluster-note">Definitively quiet (mean 0.96). Spontaneous cluster.</td>
       </tr>
+      <tr>
+        <!-- May 22 2026 Cluster 8 (11 seizures over May 22-23, ICU + readmission).
+             Pre-seizure window: May 21 11:15 UTC through May 22 11:15 UTC (24hr
+             prior to first seizure at 07:15 ET / 11:15 UTC).
+             Source: NOAA SWPC daily-geomagnetic-indices.txt, retrieved May 25 2026.
+             Planetary Kp values in window (3-hour bins, UTC):
+               May 21: 1.33 (09-12), 2.00 (12-15), 1.00 (15-18), 2.00 (18-21), 1.67 (21-24)
+               May 22: 1.33 (00-03), 1.67 (03-06), 1.67 (06-09), 1.67 (09-12)
+             Peak Kp = 2.00, Mean Kp = 1.62. Definitively quiet — well below
+             Kp≥4 ACTIVE threshold. Follows same pattern as Mar 17 (peak 1.67). -->
+        <td style="font-family:monospace">May 22 2026</td>
+        <td><span class="cluster-kp kp-quiet">2.00</span></td>
+        <td><span class="badge" style="background:#f0fdf4;color:#15803d;border-color:#86efac">QUIET ✗</span></td>
+        <td class="cluster-note">Most severe cluster yet (11 seizures over 2 days). Definitively quiet (mean 1.62, peak 2.00). Non-geomagnetic trigger.</td>
+      </tr>
     </tbody>
   </table>
 
   <!-- Calibration stats — same section as cluster data -->
-  <div class="section-head">Theodulf · Calibrated Thresholds (n=7 clusters)</div>
+  <div class="section-head">Theodulf · Calibrated Thresholds (n=8 clusters)</div>
   <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
     <div class="stat-card">
       <div class="stat-label">Geomagnetic co-trigger</div>
-      <div class="stat-val kp-active">4 / 7</div>
+      <div class="stat-val kp-active">4 / 8</div>
       <div class="stat-sub">clusters Kp ≥ 4 in 24hr prior</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Confirmed G2+ storms</div>
-      <div class="stat-val kp-storm">3 / 7</div>
+      <div class="stat-val kp-storm">3 / 8</div>
       <div class="stat-sub">clusters Kp ≥ 5 in 24hr prior</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Storm rate · seizure days</div>
-      <div class="stat-val kp-storm">10.3%</div>
-      <div class="stat-sub">vs 4.8% non-seizure (2.1×)</div>
+      <div class="stat-val kp-storm">9.0%</div>
+      <div class="stat-sub">vs 4.8% non-seizure (1.9×)</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Active rate · seizure days</div>
-      <div class="stat-val kp-active">31.0%</div>
-      <div class="stat-sub">vs 14.9% non-seizure (2.1×)</div>
+      <div class="stat-val kp-active">27.1%</div>
+      <div class="stat-sub">vs 14.9% non-seizure (1.8×)</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Max sensitivity</div>
-      <div class="stat-val kp-unsettled">57%</div>
-      <div class="stat-sub">3 clusters geomagnetically quiet</div>
+      <div class="stat-val kp-unsettled">50%</div>
+      <div class="stat-sub">4 clusters geomagnetically quiet</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Data source</div>
-      <div class="stat-val" style="font-size:13px;color:#4a7a58">GFZ</div>
-      <div class="stat-sub">Definitive Kp · Jul 2025–Mar 2026</div>
+      <div class="stat-val" style="font-size:13px;color:#4a7a58">GFZ / NOAA SWPC</div>
+      <div class="stat-sub">Definitive Kp · Jul 2025–May 2026</div>
     </div>
   </div>
 
